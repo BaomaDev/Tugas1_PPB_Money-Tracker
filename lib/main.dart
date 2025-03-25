@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/transaction.dart';
+import './models/transaction.dart';
 
 void main() {
   runApp(MoneyTrackerApp());
@@ -9,7 +9,7 @@ class MoneyTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Money Tracker',
+      title: 'Hitung Duit',
       theme: ThemeData(primarySwatch: Colors.blue),
       home: HomeScreen(),
     );
@@ -22,42 +22,78 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // List to store transactions
-  List<Transaction> _transactions = [];
+  List<Transaction> transactions = [];
 
-  // Form controllers
-  final _titleController = TextEditingController();
-  final _amountController = TextEditingController();
+  final titleController = TextEditingController();
+  final amountController = TextEditingController();
 
-  // State for transaction type
-  bool _isExpense = true;
+  bool isExpenseTransaction = true;
 
-  // Method to add a new transaction
-  void _addTransaction() {
-    final title = _titleController.text;
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
+  Transaction? currentEditTransaction;
 
-    if (title.isEmpty || amount <= 0) return;
+  //update transaction method
+  void saveTransaction() {
+    final transactionTitle = titleController.text;
+    final transactionAmount = double.tryParse(amountController.text) ?? 0.0;
 
-    final newTransaction = Transaction(
-      id: DateTime.now().toString(),
-      title: title,
-      amount: amount,
-      date: DateTime.now(),
-      isExpense: _isExpense,
-    );
+    if (transactionTitle.isEmpty || transactionAmount <= 0) return;
 
+    if (currentEditTransaction != null) {
+      //update transaction yg udh ada
+      setState(() {
+        transactions[transactions.indexWhere(
+          (t) => t.id == currentEditTransaction!.id,
+        )] = Transaction(
+          id: currentEditTransaction!.id,
+          title: transactionTitle,
+          amount: transactionAmount,
+          date: DateTime.now(),
+          isExpense: isExpenseTransaction,
+        );
+
+        currentEditTransaction = null;
+      });
+    } else {
+      //Tambah transaksi
+      final newTransaction = Transaction(
+        id: DateTime.now().toString(),
+        title: transactionTitle,
+        amount: transactionAmount,
+        date: DateTime.now(),
+        isExpense: isExpenseTransaction,
+      );
+
+      setState(() {
+        transactions.add(newTransaction);
+      });
+    }
+
+    // Reset controller sama state
+    titleController.clear();
+    amountController.clear();
+    isExpenseTransaction = true;
+  }
+
+  // Method buat edit transaksi
+  void editTransaction(Transaction transaction) {
     setState(() {
-      _transactions.add(newTransaction);
-      _titleController.clear();
-      _amountController.clear();
-      _isExpense = true;
+      currentEditTransaction = transaction;
+      titleController.text = transaction.title;
+      amountController.text = transaction.amount.toString();
+      isExpenseTransaction = transaction.isExpense;
     });
   }
 
-  //Calculator
-  double get _totalBalance {
-    return _transactions.fold(0.0, (sum, transaction) {
+  //Method delet transaski
+  void deleteTransaction(Transaction transaction) {
+    setState(() {
+      transactions.removeWhere((t) => t.id == transaction.id);
+    });
+  }
+
+  // Calculator
+  double calcTotalBalance() {
+    return transactions.fold(0.0, (sum, transaction) {
       return transaction.isExpense
           ? sum - transaction.amount
           : sum + transaction.amount;
@@ -67,73 +103,84 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Money Tracker')),
+      appBar: AppBar(title: Text('Hitung Duit')),
       body: Column(
         children: [
-          // Balance Display
+          //Balance
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'Balance: \$${_totalBalance.toStringAsFixed(2)}',
+                'Saldo: Rp ${calcTotalBalance()}',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: _totalBalance >= 0 ? Colors.green : Colors.red,
+                  color: calcTotalBalance() >= 0 ? Colors.green : Colors.red,
                 ),
               ),
             ),
           ),
 
-          // Transaction Input Form
+          // Textfield transaski
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // Transaction Type Selector
+                // Selector
                 Row(
                   children: [
-                    Text('Transaction Type:'),
                     Radio<bool>(
                       value: true,
-                      groupValue: _isExpense,
+                      groupValue: isExpenseTransaction,
                       onChanged: (value) {
                         setState(() {
-                          _isExpense = value!;
+                          isExpenseTransaction = value!;
                         });
                       },
                     ),
-                    Text('Expense'),
+                    Text('Pengeluaran'),
                     Radio<bool>(
                       value: false,
-                      groupValue: _isExpense,
+                      groupValue: isExpenseTransaction,
                       onChanged: (value) {
                         setState(() {
-                          _isExpense = value!;
+                          isExpenseTransaction = value!;
                         });
                       },
                     ),
-                    Text('Income'),
+                    Text('Pemasukan'),
                   ],
                 ),
 
                 // Title TextField
                 TextField(
-                  controller: _titleController,
-                  decoration: InputDecoration(labelText: 'Title'),
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText:
+                        currentEditTransaction != null ? 'Ubah Judul' : 'Judul',
+                  ),
                 ),
 
                 // Amount TextField
                 TextField(
-                  controller: _amountController,
+                  controller: amountController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(labelText: 'Amount'),
+                  decoration: InputDecoration(
+                    labelText:
+                        currentEditTransaction != null
+                            ? 'Ubah Jumlah'
+                            : 'Jumlah',
+                  ),
                 ),
 
-                // Add Transaction Button
+                // Add/Update Transaction Button
                 ElevatedButton(
-                  onPressed: _addTransaction,
-                  child: Text('Add Transaction'),
+                  onPressed: saveTransaction,
+                  child: Text(
+                    currentEditTransaction != null
+                        ? 'Perbarui Transaksi'
+                        : 'Tambah Transaksi',
+                  ),
                 ),
               ],
             ),
@@ -142,17 +189,35 @@ class _HomeScreenState extends State<HomeScreen> {
           // Transaction List
           Expanded(
             child: ListView.builder(
-              itemCount: _transactions.length,
+              itemCount: transactions.length,
               itemBuilder: (context, index) {
-                final transaction = _transactions[index];
+                final transaction = transactions[index];
                 return ListTile(
                   title: Text(transaction.title),
-                  subtitle: Text(transaction.isExpense ? 'Expense' : 'Income'),
-                  trailing: Text(
-                    '\$${transaction.amount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: transaction.isExpense ? Colors.red : Colors.green,
-                    ),
+                  subtitle: Text(
+                    transaction.isExpense ? 'Pengeluaran' : 'Pemasukan',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Rp ${transaction.amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color:
+                              transaction.isExpense ? Colors.red : Colors.green,
+                        ),
+                      ),
+                      // Edit Button
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => editTransaction(transaction),
+                      ),
+                      // Delete Button
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => deleteTransaction(transaction),
+                      ),
+                    ],
                   ),
                 );
               },
